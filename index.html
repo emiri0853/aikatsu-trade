@@ -539,7 +539,9 @@ function renderOwner(){
 function reqCard(r, done){
   const e = evaluate(prof, r.type, toMap(r.get), toMap(r.give));
   const money = r.type==="sell"||r.type==="buy";
-  const changed = !done && (!e.ok || (money ? Math.round(e.price)!==r.price : (e.getPt!==r.getPt || e.givePt!==r.givePt)));
+  // ng：今の譲・レートでは成立しない／moved：申込のあとでレートが変わった（成立はする）
+  const moved = !done && (money ? Math.round(e.price)!==r.price : (e.getPt!==r.getPt || e.givePt!==r.givePt));
+  const changed = !done && !e.ok;
   const li = l => (l||[]).map(x=>`<li>${thumb(card(x.no))}<span class="g">${esc(cardLabel(x.no))}</span><b>×${x.n}</b></li>`).join("");
   const when = t => t && t.toDate ? t.toDate().toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
   return `<div class="req ${changed?"bad":""}">
@@ -548,7 +550,8 @@ function reqCard(r, done){
     ${(r.get||[]).length ? `<h3>相手がもらう（自分の譲）</h3><ul class="lst">${li(r.get)}</ul>` : ""}
     ${(r.give||[]).length ? `<h3>相手が出す（自分の求）</h3><ul class="lst">${li(r.give)}</ul>` : ""}
     <p style="margin:6px 0"><b>${money ? yen(r.price) : `${fmt(r.getPt)}pt ⇔ ${fmt(r.givePt)}pt`}</b>
-      ${changed ? `<br><span class="ng">⚠ 今の譲・ポイントだと成立しません（${esc(e.ok?"ポイント・価格が変わりました":e.msg)}）</span>` : ""}</p>
+      ${changed ? `<br><span class="ng">⚠ 今の譲・レートだと成立しません（${esc(e.msg)}）</span>`
+        : moved ? `<br><span class="muted">ℹ 申込のあとでレートが変わりました。今のレートでは ${money ? yen(e.price) : `${fmt(e.getPt)}pt ⇔ ${fmt(e.givePt)}pt`} で、成立します</span>` : ""}</p>
     ${r.msg ? `<p class="muted">「${esc(r.msg)}」</p>` : ""}
     ${done ? `<p class="${r.status==="ok"?"ok":"ng"}"><b>${r.status==="ok"?"承認":"お断り"}</b>${r.blocked?"（ブロック）":""}</p>
       ${r.status==="ok" ? `<button class="btn sm" data-reply="${esc(r.id)}">成立の文章</button>` : ""}`
