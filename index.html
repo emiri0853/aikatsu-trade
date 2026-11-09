@@ -154,27 +154,29 @@ const TYPES = {
 };
 // ポイント・価格の基本（カテゴリ）。設定画面で変えられる
 const CATS = [
-  {k:"odette_p",  name:"オデットスワンP",          pt:250, sell:25000, buy:25000},
-  {k:"aurora_p",  name:"オーロラキスP",            pt:80,  sell:9500,  buy:8000},
-  {k:"er_p",      name:"ERパラレル（その他）",      pt:55,  sell:6500,  buy:5500},
-  {k:"milky_p",   name:"天の川P",                  pt:45,  sell:5000,  buy:4000},
-  {k:"pr_aurora", name:"PRオーロラキス",            pt:14,  sell:2000,  buy:1400},
-  {k:"pr_milky",  name:"PR天の川",                 pt:8,   sell:1000,  buy:700},
-  {k:"pr_other",  name:"PR（スターウェイ・レジェンダリー・プロモ）", pt:5, sell:750, buy:500},
-  {k:"er",        name:"ER",                       pt:2,   sell:500,   buy:150},
-  {k:"r",         name:"R",                        pt:0.7, sell:70,    buy:10},
+  {k:"odette_p",  name:"オデットスワンP",          pt:300, sell:30000, buy:25000},
+  {k:"aurora_p",  name:"オーロラキスP",            pt:95,  sell:11000, buy:8000},
+  {k:"er_p",      name:"ERパラレル（その他）",      pt:65,  sell:6500,  buy:5500},
+  {k:"milky_p",   name:"天の川P",                  pt:55,  sell:6000,  buy:4500},
+  {k:"pr_aurora", name:"PRオーロラキス",            pt:21,  sell:2200,  buy:1400},
+  {k:"pr_milky",  name:"PR天の川",                 pt:10,  sell:1000,  buy:700},
+  {k:"pr_other",  name:"PR（スターウェイ・レジェンダリー・プロモ）", pt:7, sell:750, buy:500},
+  {k:"er",        name:"ER",                       pt:4,   sell:500,   buy:150},
+  {k:"r",         name:"R",                        pt:0.6, sell:60,    buy:10},
   {k:"n",         name:"N",                        pt:0.15,sell:15,    buy:1},
 ];
 const CAT_NAME = Object.fromEntries(CATS.map(c=>[c.k,c.name]));
 // カードごとのおすすめ値（同じカテゴリの中で高い・安いもの）
 const DEFAULT_OVER = (()=>{
+  // 基準：取引価格（X・メルカリ）100円＝1pt
   const o = {}, set = (nos, v) => nos.forEach(no=>o[no]=Object.assign({}, o[no]||{}, v));
-  set(["E1-04-P"],{pt:95}); set(["E1-01-P"],{pt:90}); set(["E1-03-P"],{pt:70});            // オーロラキスP
-  set(["E1-50-P"],{pt:65});                                                                 // ドリームエミネンスP
-  set(["E1-33-P","E1-34-P"],{pt:50}); set(["E1-35-P"],{pt:40});                             // 天の川P
-  set(["E1-04"],{pt:18}); set(["E1-33"],{pt:10});                                           // PR
-  set(["E1-81"],{pt:7}); set(["E1-52","E1-71","E1-72","E1-73","E1-74","E1-77","E1-78","E1-82"],{pt:6});
-  set(["E1-30"],{pt:6, sell:720}); set(["E1-32"],{pt:3}); set(["E1-50"],{pt:3, sell:450});  // ER
+  set(["E1-04-P"],{pt:115}); set(["E1-01-P"],{pt:110}); set(["E1-03-P"],{pt:85});           // オーロラキスP
+  set(["E1-50-P"],{pt:75});                                                                 // ドリームエミネンスP
+  set(["E1-33-P","E1-34-P"],{pt:60}); set(["E1-35-P"],{pt:50});                             // 天の川P
+  set(["E1-04"],{pt:24});                                                                   // PRオーロラキスリボン
+  set(["E1-71","E1-72","E1-73","E1-74"],{pt:9});                                            // サンシャインスターウェイ
+  set(["E1-51","E1-52","EP-002"],{pt:6});                                                   // レジェンダリー
+  set(["E1-30"],{pt:7, sell:720}); set(["E1-32"],{pt:5}); set(["E1-50"],{pt:4.5, sell:450}); // ER
   set(["E1-05","E1-06","E1-07"],{pt:1, sell:100});                                          // アイスブルーフリル
   set(["E1-21","E1-22","E1-23","E1-41","E1-42","E1-43","E1-60","E1-61","E1-62","EP-001"],{pt:0.3, sell:30}); // スクールドレス
   return o;
@@ -234,7 +236,8 @@ function evaluate(p, type, get, give){
   if (!(p.types||{})[type]) return bad("この種類の申込は受け付けていません");
   if (cnt(lg)+cnt(lv)>20) return bad("1回の申込は合計20枚までです");
   for (const [no,n] of lg) if (n > ((p.give||{})[no]||0)) return bad(`${no} は譲れる枚数より多く選ばれています`);
-  for (const [no,n] of lv) if (!(p.want||[]).includes(no) || n>WANT_MAX) return bad(`${no} は相手が探しているカードではありません`);
+  for (const [no,n] of lv) if (!(p.want||[]).includes(no) ) return bad(`${no} は相手が探しているカードではありません`);
+  for (const [no,n] of lv) if (n>wantMax(p)) return bad(`${no} は${wantMax(p)}枚までです`);
   if (type==="eq" || type==="ratio"){
     if (!lg.length) return bad("欲しいカードを選んでください");
     if (!lv.length) return bad("出すカードを選んでください");
@@ -258,7 +261,8 @@ function evaluate(p, type, get, give){
   }
   r.ok = true; r.msg = "この内容で申し込めます ✓"; return r;
 }
-const WANT_MAX = 5;   // 出すカード（相手の求）は1種類5枚まで
+// 出すカード（相手の求）の1種類あたりの上限。持ち主が設定タブで決める（未設定は5枚）
+const wantMax = p => Math.max(1, Math.min(20, Math.floor(+p.wantMax) || 5));
 const toMap = l => Object.fromEntries((l||[]).map(x=>[x.no,x.n]));
 const toList = m => Object.entries(m||{}).filter(([,n])=>n>0).map(([no,n])=>({no,n}));
 const listText = l => (l||[]).map(x=>`${cardLabel(x.no)}${x.n>1?" ×"+x.n:""}`).join("、") || "なし";
@@ -337,8 +341,8 @@ function renderApply(){
       <p class="muted">${esc(p.name||profId)}さんが譲れるカードです。カードをタップすると選べます（もう一度タップで1枚追加）。</p>
       ${gets.filter(hit).length ? `<div class="grid">${gets.filter(hit).map(no=>tile(no,"get",p.give[no])).join("")}</div>` : `<p class="muted">${q?"見つかりませんでした":"いま譲れるカードはありません"}</p>`}</div>` : ""}
     ${A.type && side==="give" ? `<div class="box"><h2>${A.type==="buy"?"買い取ってほしいカードを選んでください":"あなたが出すカードを選んでください"}</h2>
-      <p class="muted">${esc(p.name||profId)}さんが探しているカードです。カードをタップすると選べます（同じカードは5枚まで）。</p>
-      ${gives.filter(hit).length ? `<div class="grid">${gives.filter(hit).map(no=>tile(no,"give",WANT_MAX)).join("")}</div>` : `<p class="muted">${q?"見つかりませんでした":"いま探しているカードはありません"}</p>`}</div>` : ""}
+      <p class="muted">${esc(p.name||profId)}さんが探しているカードです。カードをタップすると選べます${wantMax(p)>1?`（同じカードは${wantMax(p)}枚まで）`:""}。</p>
+      ${gives.filter(hit).length ? `<div class="grid">${gives.filter(hit).map(no=>tile(no,"give",wantMax(p))).join("")}</div>` : `<p class="muted">${q?"見つかりませんでした":"いま探しているカードはありません"}</p>`}</div>` : ""}
     <details class="box"><summary><b>ポイント・価格の目安</b></summary>
       <table class="pt"><tr><th>カテゴリ</th><th>pt</th>${p.types.sell?"<th>譲渡</th>":""}${p.types.buy?"<th>買取</th>":""}</tr>
       ${CATS.map(c=>{ const v=catsOf(p)[c.k]; return `<tr><td>${esc(c.name)}</td><td>${fmt(v.pt)}</td>${p.types.sell?`<td>${yen(v.sell)}</td>`:""}${p.types.buy?`<td>${yen(v.buy)}</td>`:""}</tr>`; }).join("")}</table>
@@ -428,7 +432,7 @@ document.addEventListener("click", e=>{
   if (t.dataset.side){ A.side = t.dataset.side; renderApply(); const st=$("#stick"); if (st) window.scrollTo({top: Math.max(0, st.getBoundingClientRect().top + window.scrollY - 64)}); return; }
   if (t.dataset.st){
     const m = t.dataset.st==="get" ? A.get : A.give, no = t.dataset.no;
-    const max = t.dataset.st==="get" ? (prof.give[no]||0) : WANT_MAX, cur = m[no]||0;
+    const max = t.dataset.st==="get" ? (prof.give[no]||0) : wantMax(prof), cur = m[no]||0;
     m[no] = +t.dataset.d < 0 ? Math.max(0, cur-1) : (cur>=max ? 0 : cur+1);
     renderApply(); return;
   }
@@ -613,6 +617,7 @@ function ownerSet(){
       <label class="f"><span>受け付ける種類</span></label>
       <div class="chips">${Object.keys(TYPES).map(k=>`<button class="chip" data-tg="${k}" aria-pressed="${!!(p.types||{})[k]}">${TYPES[k].name}</button>`).join("")}</div>
       <label class="f"><span>比率交換：何%まで少なくてもOKにするか（0=ぴったり以上）</span><input type="number" id="sTol" min="0" max="50" step="1" value="${+p.tol||0}"></label>
+      <label class="f"><span>相手が出すカード（自分の求）：同じカードを何枚まで受け取るか（1〜20）</span><input type="number" id="sWant" min="1" max="20" step="1" value="${wantMax(p)}"></label>
       <label class="f"><span>お知らせ（発送方法・注意など）</span><textarea id="sNote" maxlength="300">${esc(p.note||"")}</textarea></label>
       <button class="btn primary" id="sSave">保存</button></div>
     <div class="box"><h2>ブロック</h2><div id="blk"><button class="btn sm" id="blkLoad">ブロック中の一覧を見る</button></div></div>
@@ -653,7 +658,7 @@ document.addEventListener("click", async e=>{
     const types = {}; document.querySelectorAll("[data-tg]").forEach(b=>types[b.dataset.tg]=b.getAttribute("aria-pressed")==="true");
     if (!Object.values(types).some(Boolean)) return toast("種類を1つ以上選んでください");
     try{ await pref(profId).update({name:$("#sName").value.trim()||profId, xid:$("#sX").value.trim().replace(/^@/,""), types,
-      tol:Math.max(0,Math.min(50,+$("#sTol").value||0)), note:$("#sNote").value.trim().slice(0,300)}); toast("保存しました"); }
+      tol:Math.max(0,Math.min(50,+$("#sTol").value||0)), wantMax:Math.max(1,Math.min(20,Math.floor(+$("#sWant").value)||5)), note:$("#sNote").value.trim().slice(0,300)}); toast("保存しました"); }
     catch(err){ toast(errText(err)); }
     return;
   }
