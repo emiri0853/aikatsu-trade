@@ -126,8 +126,8 @@ table.pt input{padding:5px 6px;min-width:60px}
 /* ========== 共通 ========== */
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const r1 = n => Math.round(n*10)/10;
-const fmt = n => (Math.round(n*10)/10).toLocaleString("ja-JP");
+const r1 = n => Math.round(n*100)/100;   // ポイントは小数2桁まで
+const fmt = n => r1(n).toLocaleString("ja-JP", {maximumFractionDigits:2});
 const yen = n => "¥"+Math.round(n).toLocaleString("ja-JP");
 let toastT; function toast(m){ $("#toast").innerHTML=`<div class="toast">${esc(m)}</div>`; clearTimeout(toastT); toastT=setTimeout(()=>$("#toast").innerHTML="",2600); }
 function sheet(html){ $("#sheet").innerHTML = html ? `<div class="sheetbg" data-close="1"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>` : ""; }
@@ -144,17 +144,29 @@ const TYPES = {
 const CATS = [
   {k:"odette_p",  name:"オデットスワンP",          pt:250, sell:25000, buy:25000},
   {k:"aurora_p",  name:"オーロラキスP",            pt:80,  sell:9500,  buy:8000},
-  {k:"er_p",      name:"ERパラレル（その他）",      pt:60,  sell:6500,  buy:5500},
+  {k:"er_p",      name:"ERパラレル（その他）",      pt:55,  sell:6500,  buy:5500},
   {k:"milky_p",   name:"天の川P",                  pt:45,  sell:5000,  buy:4000},
-  {k:"pr_aurora", name:"PRオーロラキス",            pt:18,  sell:2000,  buy:1400},
-  {k:"pr_milky",  name:"PR天の川",                 pt:10,  sell:1000,  buy:700},
-  {k:"pr_other",  name:"PR（スターウェイ・レジェンダリー・プロモ）", pt:6, sell:750, buy:500},
-  {k:"er",        name:"ER",                       pt:4,   sell:500,   buy:150},
-  {k:"r",         name:"R",                        pt:1,   sell:30,    buy:10},
-  {k:"n",         name:"N",                        pt:0.1, sell:10,    buy:1},
+  {k:"pr_aurora", name:"PRオーロラキス",            pt:14,  sell:2000,  buy:1400},
+  {k:"pr_milky",  name:"PR天の川",                 pt:8,   sell:1000,  buy:700},
+  {k:"pr_other",  name:"PR（スターウェイ・レジェンダリー・プロモ）", pt:5, sell:750, buy:500},
+  {k:"er",        name:"ER",                       pt:2,   sell:500,   buy:150},
+  {k:"r",         name:"R",                        pt:0.7, sell:70,    buy:10},
+  {k:"n",         name:"N",                        pt:0.15,sell:15,    buy:1},
 ];
 const CAT_NAME = Object.fromEntries(CATS.map(c=>[c.k,c.name]));
-const DEFAULT_OVER = { "E1-30":{pt:5, sell:720}, "E1-50":{pt:3, sell:450} };
+// カードごとのおすすめ値（同じカテゴリの中で高い・安いもの）
+const DEFAULT_OVER = (()=>{
+  const o = {}, set = (nos, v) => nos.forEach(no=>o[no]=Object.assign({}, o[no]||{}, v));
+  set(["E1-04-P"],{pt:95}); set(["E1-01-P"],{pt:90}); set(["E1-03-P"],{pt:70});            // オーロラキスP
+  set(["E1-50-P"],{pt:65});                                                                 // ドリームエミネンスP
+  set(["E1-33-P","E1-34-P"],{pt:50}); set(["E1-35-P"],{pt:40});                             // 天の川P
+  set(["E1-04"],{pt:18}); set(["E1-33"],{pt:10});                                           // PR
+  set(["E1-81"],{pt:7}); set(["E1-52","E1-71","E1-72","E1-73","E1-74","E1-77","E1-78","E1-82"],{pt:6});
+  set(["E1-30"],{pt:6, sell:720}); set(["E1-32"],{pt:3}); set(["E1-50"],{pt:3, sell:450});  // ER
+  set(["E1-05","E1-06","E1-07"],{pt:1, sell:100});                                          // アイスブルーフリル
+  set(["E1-21","E1-22","E1-23","E1-41","E1-42","E1-43","E1-60","E1-61","E1-62","EP-001"],{pt:0.3, sell:30}); // スクールドレス
+  return o;
+})();
 function catOf(c){
   const m = /^E1-(\d+)(-P)?$/.exec(c.no), n = m ? +m[1] : 0;
   if (/-P$/.test(c.no)){
@@ -415,7 +427,9 @@ function startOwner(){
     me = (u && !u.isAnonymous) ? u : null; prof = null; profId = null; reqs = []; hist = null;
     if (!me){ renderLogin(); return; }
     $("#app").innerHTML = `<p class="muted">読み込み中…</p>`;
-    const qs = await db.collection("trade_profiles").where("uid","==",me.uid).limit(1).get();
+    let qs;
+    try{ qs = await db.collection("trade_profiles").where("uid","==",me.uid).limit(1).get(); }
+    catch(e){ console.warn(e); $("#app").innerHTML = `<div class="box"><h2>読み込めませんでした</h2><p class="muted">${String(e.code||"").includes("permission-denied") ? "FirestoreのルールがREADME.mdの内容になっていません。ルールを置き換えて「公開」してください。" : esc(errText(e))}</p><button class="btn sm" id="logout">ログアウト</button></div>`; return; }
     if (qs.empty){ renderCreate(); return; }
     profId = qs.docs[0].id; prof = qs.docs[0].data();
     unsubReq = pref(profId).collection("requests").orderBy("createdAt","desc").onSnapshot(s=>{
@@ -596,6 +610,7 @@ function ownerPt(){
       return `<div class="ovr">${thumb(c)}<div><b style="font-size:13px">${esc(no)}</b> <span style="font-size:12px">${esc(c.name)}</span><br><span class="muted" style="font-size:11px">${esc(CAT_NAME[k])}</span></div>
         <div class="in3">${["pt","sell","buy"].map(f=>`<input type="number" step="any" min="0" data-ov="${esc(no)}" data-f="${f}" placeholder="${f==="pt"?"pt ":"¥"}${cs[k][f]}" value="${ov(no)[f]!==undefined?esc(ov(no)[f]):""}" aria-label="${esc(no)} ${f}">`).join("")}</div></div>`; }).join("")}
     ${list.length>150?`<p class="muted">ほか${list.length-150}枚（検索で絞り込んでください）</p>`:""}</div></div>
+    <div class="box"><h2>おすすめ値に戻す</h2><p class="muted">カテゴリ・カードごとの値を、アプリのおすすめ値（2026/11の相場）に戻します。</p><button class="btn sm warn" id="ptReset">おすすめ値に戻す</button></div>
     <div class="bar"><div class="in"><div class="sum muted">変えたら保存してください</div><button class="btn primary" id="ptSave">保存</button></div></div>`;
 }
 document.addEventListener("click", async e=>{
@@ -624,6 +639,11 @@ document.addEventListener("click", async e=>{
       if (i.value==="") delete o[i.dataset.f]; else o[i.dataset.f]=+i.value;
       if (Object.keys(o).length) over[no]=o; else delete over[no]; });
     try{ await pref(profId).update({cats, over}); toast("保存しました"); }catch(err){ toast(errText(err)); }
+    return;
+  }
+  if (t.id==="ptReset"){
+    if (!confirm("ポイント・価格をすべておすすめ値に戻しますか？")) return;
+    try{ await pref(profId).update({cats:{}, over:DEFAULT_OVER}); toast("おすすめ値に戻しました"); }catch(err){ toast(errText(err)); }
     return;
   }
   if (t.id==="blkLoad" || t.dataset.unblock){
